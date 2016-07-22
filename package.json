@@ -1,0 +1,25 @@
+{
+  "name": "funga",
+  "version": "0.1.0",
+  "license": "MIT",
+  "main": "src/funga.js",
+  "devDependencies": {
+    "browserify": "~13.0.0",
+    "jest-cli": "~12.0.2",
+    "lodash": "~4.6.1",
+    "mkdirp": "~0.5.1",
+    "uglify-js": "~2.7.0"
+  },
+  "engines": {
+    "node": ">=0.12.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "build": "mkdirp build && browserify -e src/funga.js -s funga | uglifyjs > build/funga.min.js"
+  },
+  "jest": {
+    "automock": false,
+    "testDirectoryName": "test",
+    "verbose": true
+  }
+}
