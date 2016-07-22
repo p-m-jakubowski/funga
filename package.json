@@ -2,6 +2,10 @@
   "name": "funga",
   "version": "0.1.0",
   "license": "MIT",
+  "repository": {
+      "type": "git",
+      "url": "https://github.com/p-m-jakubowski/funga"
+  },
   "main": "src/funga.js",
   "devDependencies": {
     "browserify": "~13.0.0",
