@@ -1,5 +1,10 @@
 'use strict';
 
+// little hack to handle circular dependencies
+module.exports = Emitter;
+
+var Resolver = require('./Resolver');
+
 var STATE = {
     RUNNING: 0,
     DESTROYED: 1
@@ -10,6 +15,7 @@ function Emitter(base, args) {
     var destructor;
     var state;
     var timeout;
+    var outputResolver;
 
     if (typeof base !== 'function') {
         throw new Error('Base should be a function');
@@ -36,10 +42,7 @@ function Emitter(base, args) {
                 throw new Error('emit when not running');
             }
 
-            clearTimeout(timeout);
-            timeout = setTimeout(function() {
-                onValue(value);
-            });
+            outputResolver.resolve(value);
         }
 
         function fail(error) {
@@ -55,6 +58,15 @@ function Emitter(base, args) {
 
         try {
             state = STATE.RUNNING;
+            outputResolver = new Resolver(
+                function (value) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(function() {
+                        onValue(value);
+                    });
+                }, 
+                fail
+            );
             destructor = base.apply(null, [emit, fail].concat(args));
         } catch (error) {
             fail(error);
@@ -64,11 +76,13 @@ function Emitter(base, args) {
     this.destroy = function() {
         state = STATE.DESTROYED;
         clearTimeout(timeout);
+        if (outputResolver) {
+            outputResolver.dispose();
+            outputResolver = null;
+        }
         if (typeof destructor === 'function') {
             destructor();
             destructor = null;
         }
     };
 }
-
-module.exports = Emitter;
