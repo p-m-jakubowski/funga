@@ -6,16 +6,78 @@ module.exports = Emitter;
 var Resolver = require('./Resolver');
 
 var STATE = {
-    RUNNING: 0,
-    DESTROYED: 1
+    RESOLVED: 0,
+    FAILED: 1
 };
 
 function Emitter(executor, args) {
     var self = this;
+    var handlers;
+    var isRunning;
     var destructor;
     var state;
     var timeout;
+    var value;
+    var error;
     var outputResolver;
+
+    function start() {
+        function emit(value) {
+            if (!isRunning) {
+                throw new Error('emit when not running');
+            }
+            outputResolver.resolve(value);
+        }
+
+        function fail(_error) {
+            if (!isRunning) {
+                throw new Error('fail when not running');
+            }
+
+            state = STATE.FAILED;
+            error = _error;
+            destroy();
+
+            timeout = setTimeout(function() {
+                for (var i in handlers) {
+                    handlers[i].onError(error);
+                }
+                handlers = null;
+            });
+        }
+
+        try {
+            isRunning = true;
+            outputResolver = new Resolver(
+                function (_value) {
+                    clearTimeout(timeout);
+                    state = STATE.RESOLVED;
+                    value = _value;
+                    timeout = setTimeout(function(_value) {
+                        for (var i in handlers) {
+                            handlers[i].onValue(value);
+                        }
+                    });
+                }, 
+                fail
+            );
+            destructor = executor.apply(null, [emit, fail].concat(args));
+        } catch (error) {
+            fail(error);
+        }
+    }
+
+    function destroy() {
+        clearTimeout(timeout);
+        isRunning = false;
+        if (typeof destructor === 'function') {
+            destructor();
+            destructor = null;
+        }
+        if (outputResolver) {
+            outputResolver.dispose();
+        }
+    }
 
     if (typeof executor !== 'function') {
         throw new Error('Base should be a function');
@@ -25,9 +87,7 @@ function Emitter(executor, args) {
     this.args = args || [];
 
     this.next = function(onValue, onError) {
-        if (state !== undefined) {
-            return;
-        }
+        var handler;
 
         if (typeof onValue !== 'function') {
             throw new Error('onValue must be a function');
@@ -36,53 +96,52 @@ function Emitter(executor, args) {
         if (typeof onError !== 'function') {
             throw new Error('onError must be a function');
         }
-        
-        function emit(value) {
-            if (state !== STATE.RUNNING) {
-                throw new Error('emit when not running');
-            }
 
-            outputResolver.resolve(value);
+        handler = createHandler(onValue, onError);
+
+        if (isRunning === undefined) {
+            start();
+        } else if (state === STATE.RESOLVED) {
+            handler.onValue(value);
+        } else if (state === STATE.FAILED) {
+            handler.onError(error);
         }
 
-        function fail(error) {
-            if (state !== STATE.RUNNING) {
-                throw new Error('fail when not running');
-            }
-
-            self.cancel();
-            timeout = setTimeout(function() {
-                onError(error);
-            });
-        }
-
-        try {
-            state = STATE.RUNNING;
-            outputResolver = new Resolver(
-                function (value) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(function() {
-                        onValue(value);
-                    });
-                }, 
-                fail
-            );
-            destructor = executor.apply(null, [emit, fail].concat(args));
-        } catch (error) {
-            fail(error);
-        }
+        handlers = handlers || [];
+        handlers.push(handler);
     };
 
     this.cancel = function() {
-        state = STATE.DESTROYED;
-        clearTimeout(timeout);
-        if (outputResolver) {
-            outputResolver.dispose();
-            outputResolver = null;
-        }
-        if (typeof destructor === 'function') {
-            destructor();
-            destructor = null;
+        destroy();
+        if (handlers) {
+            for (var i in handlers) {
+                handlers[i].cancel();
+            }
+            handlers = null;
         }
     };
 }
+
+function createHandler(onValue, onError) {
+    var timeout;
+
+    return {
+        onValue: function(value) {
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                onValue(value);
+            });
+        },
+        onError: function(error) {
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                onError(error);
+            });
+        },
+        cancel: function() {
+            clearTimeout(timeout);
+        }
+    };
+}
+
+module.exports = Emitter;

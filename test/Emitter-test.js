@@ -78,82 +78,137 @@ describe('Emitter', function() {
         expect(executor.mock.calls.length).toBe(1);
     });
 
-    it('should call asynchronously value handler with value passed to emit', function() {
+    it('should call asynchronously value handlers with value passed to emit', function() {
+        var value = {a: 1, b: 2};
+        var onValueA = jest.fn();
+        var onValueB = jest.fn();
+
+        emitter.next(onValueA, noop);
+        emitter.next(onValueB, noop);
+        jest.runAllTimers();
+        expect(onValueA).not.toBeCalled();
+        expect(onValueB).not.toBeCalled();
+
+        emit(value);
+        jest.runAllTimers();
+        expect(onValueA).toBeCalled();
+        expect(onValueB).toBeCalled();
+        expect(onValueA.mock.calls[0][0]).toBe(value);
+        expect(onValueB.mock.calls[0][0]).toBe(value);
+    });
+
+    it('should call asynchronously newly registered value handler with last emitted value', function() {
         var value = {a: 1, b: 2};
         var onValue = jest.fn();
 
-        emitter.next(onValue, noop);
+        emitter.next(noop, noop);
         jest.runAllTimers();
+        emit(value);
+        jest.runAllTimers();
+        emitter.next(onValue, noop);
         expect(onValue).not.toBeCalled();
 
-        emit(value);
         jest.runAllTimers();
         expect(onValue).toBeCalled();
         expect(onValue.mock.calls[0][0]).toBe(value);
     });
 
-    it('should not call pending value handler after subsequent emit calls', function() {
-        var onValue = jest.fn();
+    it('should not call pending value handlers after subsequent emit calls', function() {
+        var onValueA = jest.fn();
+        var onValueB = jest.fn();
 
-        emitter.next(onValue, noop);
+        emitter.next(onValueA, noop);
+        emitter.next(onValueB, noop);
         jest.runAllTimers();
-        expect(onValue).not.toBeCalled();
+        expect(onValueA).not.toBeCalled();
+        expect(onValueB).not.toBeCalled();
 
         emit();
         emit();
         jest.runAllTimers();
-        expect(onValue.mock.calls.length).toBe(1);
+        expect(onValueA.mock.calls.length).toBe(1);
+        expect(onValueB.mock.calls.length).toBe(1);
     });
 
 
-    it('should not call pending value handler after being canceled', function() {
-        var onValue = jest.fn();
+    it('should not call pending value handlers after being canceled', function() {
+        var onValueA = jest.fn();
+        var onValueB = jest.fn();
 
-        emitter.next(onValue, noop);
+        emitter.next(onValueA, noop);
+        emitter.next(onValueB, noop);
         jest.runAllTimers();
-        expect(onValue).not.toBeCalled();
+        expect(onValueA).not.toBeCalled();
+        expect(onValueB).not.toBeCalled();
 
         emit();
         emitter.cancel();
         jest.runAllTimers();
-        expect(onValue).not.toBeCalled();
+        expect(onValueA).not.toBeCalled();
+        expect(onValueB).not.toBeCalled();
     });
 
-    it('should call asynchronously error handler with error passed to fail function', function() {
-        var onError = jest.fn();
+    it('should call asynchronously error handlers with error passed to fail function', function() {
+        var onErrorA = jest.fn();
+        var onErrorB = jest.fn();
         var error = new Error();
 
-        emitter.next(noop, onError);
+        emitter.next(noop, onErrorA);
+        emitter.next(noop, onErrorB);
         jest.runAllTimers();
-        expect(onError).not.toBeCalled();
+        expect(onErrorA).not.toBeCalled();
+        expect(onErrorB).not.toBeCalled();
 
         fail(error);
         jest.runAllTimers();
-        expect(onError).toBeCalled();
-        expect(onError.mock.calls[0][0]).toBe(error);
+        expect(onErrorA).toBeCalled();
+        expect(onErrorB).toBeCalled();
+        expect(onErrorA.mock.calls[0][0]).toBe(error);
+        expect(onErrorB.mock.calls[0][0]).toBe(error);
     });
 
-    it('should call error handler when executor throws an error', function() {
-        var onError = jest.fn();
+    it('should call error handlers when executor throws an error', function() {
+        var onErrorA = jest.fn();
+        var onErrorB = jest.fn();
 
         emitter = new Emitter(function() { throw new Error(); });
 
+        expect(onErrorA).not.toBeCalled();
+        expect(onErrorB).not.toBeCalled();
+
+        emitter.next(noop, onErrorA);
+        emitter.next(noop, onErrorB);
+        jest.runAllTimers();
+        expect(onErrorA).toBeCalled();
+        expect(onErrorB).toBeCalled();
+    });
+
+    it('should call asynchronously newly registered error handler with thrown error', function() {
+        var onError = jest.fn();
+
+        emitter.next(noop, noop);
+        jest.runAllTimers();
+        fail(new Error());
+        jest.runAllTimers();
+        emitter.next(noop, onError);
         expect(onError).not.toBeCalled();
 
-        emitter.next(noop, onError);
         jest.runAllTimers();
         expect(onError).toBeCalled();
     });
 
-    it('should not call pending error handler after being canceled', function() {
-        var onError = jest.fn();
+    it('should not call pending error handlers after being canceled', function() {
+        var onErrorA = jest.fn();
+        var onErrorB = jest.fn();
 
-        emitter.next(noop, onError);
+        emitter.next(noop, onErrorA);
+        emitter.next(noop, onErrorB);
         jest.runAllTimers();
         fail();
         emitter.cancel();
         jest.runAllTimers();
-        expect(onError).not.toBeCalled();
+        expect(onErrorA).not.toBeCalled();
+        expect(onErrorB).not.toBeCalled();
     });
 
     it('should call destructor when being canceled', function() {
