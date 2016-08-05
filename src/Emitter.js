@@ -53,7 +53,7 @@ function Emitter(executor, args) {
                     clearTimeout(timeout);
                     state = STATE.RESOLVED;
                     value = _value;
-                    timeout = setTimeout(function(_value) {
+                    timeout = setTimeout(function() {
                         for (var i in handlers) {
                             handlers[i].onValue(value);
                         }
