@@ -50,7 +50,7 @@ function Emitter(executor, args) {
                 throw new Error('fail when not running');
             }
 
-            self.destroy();
+            self.cancel();
             timeout = setTimeout(function() {
                 onError(error);
             });
@@ -73,7 +73,7 @@ function Emitter(executor, args) {
         }
     };
 
-    this.destroy = function() {
+    this.cancel = function() {
         state = STATE.DESTROYED;
         clearTimeout(timeout);
         if (outputResolver) {

@@ -28,7 +28,7 @@ describe('Emitter', function() {
     afterEach(function() {
         emit = null;
         fail = null;
-        emitter.destroy();
+        emitter.cancel();
     });
 
     it('should throw an error when executor is not a function', function() {
@@ -106,7 +106,7 @@ describe('Emitter', function() {
     });
 
 
-    it('should not call pending value handler after being destroyed', function() {
+    it('should not call pending value handler after being canceled', function() {
         var onValue = jest.fn();
 
         emitter.next(onValue, noop);
@@ -114,7 +114,7 @@ describe('Emitter', function() {
         expect(onValue).not.toBeCalled();
 
         emit();
-        emitter.destroy();
+        emitter.cancel();
         jest.runAllTimers();
         expect(onValue).not.toBeCalled();
     });
@@ -145,23 +145,23 @@ describe('Emitter', function() {
         expect(onError).toBeCalled();
     });
 
-    it('should not call pending error handler after being destroyed', function() {
+    it('should not call pending error handler after being canceled', function() {
         var onError = jest.fn();
 
         emitter.next(noop, onError);
         jest.runAllTimers();
         fail();
-        emitter.destroy();
+        emitter.cancel();
         jest.runAllTimers();
         expect(onError).not.toBeCalled();
     });
 
-    it('should call destructor when being destroyed', function() {
+    it('should call destructor when being canceled', function() {
         emitter.next(noop, noop);
         jest.runAllTimers();
         expect(destructor).not.toBeCalled();
 
-        emitter.destroy();
+        emitter.cancel();
         expect(destructor).toBeCalled();
     });
 
@@ -174,17 +174,17 @@ describe('Emitter', function() {
         expect(destructor).toBeCalled();
     });
 
-    it('should throw an error on emit calls after being destroyed', function() {
+    it('should throw an error on emit calls after being canceled', function() {
         emitter.next(noop, noop);
         jest.runAllTimers();
-        emitter.destroy();
+        emitter.cancel();
         expect(emit).toThrow();
     });
 
-    it('should throw an error on fail calls after being destroyed', function() {
+    it('should throw an error on fail calls after being canceled', function() {
         emitter.next(noop, noop);
         jest.runAllTimers();
-        emitter.destroy();
+        emitter.cancel();
         expect(fail).toThrow();
     });
 
@@ -234,7 +234,7 @@ describe('Emitter', function() {
         expect(onValue.mock.calls[1][0]).toEqual(nestedValue);
     });
     
-    it('should destroy nested emitter when being destroyed', function() {
+    it('should cancel nested emitter when being canceled', function() {
         var nestedEmitterDestructor = jest.fn();
         var nestedEmitter = new Emitter(jest.fn(function() {
             return nestedEmitterDestructor;
@@ -246,7 +246,7 @@ describe('Emitter', function() {
         jest.runAllTimers();
         expect(nestedEmitterDestructor).not.toBeCalled();
 
-        emitter.destroy();
+        emitter.cancel();
         expect(nestedEmitterDestructor).toBeCalled();
     });
 
@@ -281,7 +281,7 @@ describe('Emitter', function() {
         expect(onValue.mock.calls[1][0]).toEqual([nestedValue]);
     });
 
-    it('should reuse emitters in enumerable and destroy not reused', function() {
+    it('should reuse emitters in enumerable and cancel not reused', function() {
         var nestedValueA = {};
         var nestedValueB = {};
         var nestedValueC = {};
@@ -333,7 +333,7 @@ describe('Emitter', function() {
         expect(onValue.mock.calls[1][0].c).toBe(nestedValueD);
     });
 
-    it('should destroy emitters in enumerable when being destroyed', function() {
+    it('should cancel emitters in enumerable when being canceled', function() {
         var nestedEmitterDestructorA = jest.fn();
         var nestedEmitterA = new Emitter(jest.fn(function() {
             return nestedEmitterDestructorA;
@@ -345,11 +345,11 @@ describe('Emitter', function() {
         jest.runAllTimers();
         expect(nestedEmitterDestructorA).not.toBeCalled();
 
-        emitter.destroy();
+        emitter.cancel();
         expect(nestedEmitterDestructorA).toBeCalled();
     });
 
-    it('should call error handler and destroy emitters in enumerable when any of them fails', function() {
+    it('should call error handler and cancel emitters in enumerable when any of them fails', function() {
         var nestedEmitterDestructorA = jest.fn();
         var nestedEmitterA = new Emitter(jest.fn(function() {
             return nestedEmitterDestructorA;

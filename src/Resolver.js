@@ -66,7 +66,7 @@ function EmitterResolver(onResolve, onError) {
 
     this.dispose = function() {
         if (lastEmitter) {
-            lastEmitter.destroy();
+            lastEmitter.cancel();
             lastEmitter = null;
         }
     };
