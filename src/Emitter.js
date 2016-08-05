@@ -86,8 +86,6 @@ function Emitter(executor, args) {
     this.args = args || [];
 
     this.next = function(onValue, onError) {
-        var handler;
-
         if (typeof onValue !== 'function') {
             throw new Error('onValue must be a function');
         }
@@ -96,7 +94,7 @@ function Emitter(executor, args) {
             throw new Error('onError must be a function');
         }
 
-        handler = createHandler(onValue, onError);
+        var handler = createHandler(onValue, onError);
 
         if (isRunning === undefined) {
             start();
