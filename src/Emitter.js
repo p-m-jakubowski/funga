@@ -11,7 +11,6 @@ var STATE = {
 };
 
 function Emitter(executor, args) {
-    var self = this;
     var handlers;
     var isRunning;
     var destructor;
