@@ -2,9 +2,9 @@
 
 var Emitter = require('./Emitter');
 
-function factory(base) {
+function factory(executor) {
     return function() {
-        return new Emitter(base, Array.prototype.slice.call(arguments));
+        return new Emitter(executor, Array.prototype.slice.call(arguments));
     };
 }
 

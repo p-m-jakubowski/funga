@@ -7,7 +7,7 @@ var Emitter = require('../src/Emitter');
 describe('Emitter', function() {
 
     var emitter;
-    var base;
+    var executor;
     var args;
     var destructor;
     var emit;
@@ -16,13 +16,13 @@ describe('Emitter', function() {
 
     beforeEach(function() {
         destructor = jest.fn();
-        base = jest.fn(function(_emit, _fail) {
+        executor = jest.fn(function(_emit, _fail) {
             emit = _emit;
             fail = _fail;
             return destructor;
         });
         args = [{}, {}];
-        emitter = new Emitter(base, args);
+        emitter = new Emitter(executor, args);
     });
 
     afterEach(function() {
@@ -31,14 +31,14 @@ describe('Emitter', function() {
         emitter.destroy();
     });
 
-    it('should throw an error when base is not a function', function() {
+    it('should throw an error when executor is not a function', function() {
         expect(function() {
             new Emitter(null);
         }).toThrow();
     });
 
-    it('should expose base and arguments', function() {
-        expect(emitter.base).toBe(base);
+    it('should expose executor and arguments', function() {
+        expect(emitter.executor).toBe(executor);
         expect(emitter.args.length).toBe(2);
         expect(emitter.args[0]).toBe(args[0]);
         expect(emitter.args[1]).toBe(args[1]);
@@ -56,26 +56,26 @@ describe('Emitter', function() {
         }).toThrow();
     });
 
-    it('should call base on first #next call', function() {
-        expect(base).not.toBeCalled();
+    it('should call executor on first #next call', function() {
+        expect(executor).not.toBeCalled();
 
         emitter.next(noop, noop);
-        expect(base).toBeCalled();
+        expect(executor).toBeCalled();
     });
 
-    it('should pass arguments to base', function() {
+    it('should pass arguments to executor', function() {
         emitter.next(noop, noop);
         jest.runAllTimers();
-        expect(base.mock.calls[0][2]).toBe(args[0]);
-        expect(base.mock.calls[0][3]).toBe(args[1]);
+        expect(executor.mock.calls[0][2]).toBe(args[0]);
+        expect(executor.mock.calls[0][3]).toBe(args[1]);
     });
 
-    it('should not call base on subsequent #next calls', function() {
+    it('should not call executor on subsequent #next calls', function() {
         emitter.next(noop, noop);
         jest.runAllTimers();
         emitter.next(noop, noop);
         jest.runAllTimers();
-        expect(base.mock.calls.length).toBe(1);
+        expect(executor.mock.calls.length).toBe(1);
     });
 
     it('should call asynchronously value handler with value passed to emit', function() {
@@ -133,7 +133,7 @@ describe('Emitter', function() {
         expect(onError.mock.calls[0][0]).toBe(error);
     });
 
-    it('should call error handler when base throws an error', function() {
+    it('should call error handler when executor throws an error', function() {
         var onError = jest.fn();
 
         emitter = new Emitter(function() { throw new Error(); });

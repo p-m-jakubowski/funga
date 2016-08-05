@@ -3,7 +3,7 @@
 var Emitter = require('./Emitter');
 
 function compareEmitters(emitterA, emitterB) {
-    if (emitterA.base !== emitterB.base) {
+    if (emitterA.executor !== emitterB.executor) {
         return false;
     }
 

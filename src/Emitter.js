@@ -10,18 +10,18 @@ var STATE = {
     DESTROYED: 1
 };
 
-function Emitter(base, args) {
+function Emitter(executor, args) {
     var self = this;
     var destructor;
     var state;
     var timeout;
     var outputResolver;
 
-    if (typeof base !== 'function') {
+    if (typeof executor !== 'function') {
         throw new Error('Base should be a function');
     }
 
-    this.base = base;
+    this.executor = executor;
     this.args = args || [];
 
     this.next = function(onValue, onError) {
@@ -67,7 +67,7 @@ function Emitter(base, args) {
                 }, 
                 fail
             );
-            destructor = base.apply(null, [emit, fail].concat(args));
+            destructor = executor.apply(null, [emit, fail].concat(args));
         } catch (error) {
             fail(error);
         }
