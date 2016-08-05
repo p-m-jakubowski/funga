@@ -8,6 +8,5 @@ function factory(executor) {
     };
 }
 
-module.exports = {
-    factory: factory
-};
+module.exports = Emitter;
+module.exports.factory = factory;

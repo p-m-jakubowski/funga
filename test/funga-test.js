@@ -6,6 +6,10 @@ var funga = require('../src/funga');
 
 describe('funga', function() {
 
+    it('should export Emitter', function() {
+        expect(funga).toBe(Emitter);
+    });
+
     describe('#factory', function() {
 
         it('should return emitter factory', function() {
