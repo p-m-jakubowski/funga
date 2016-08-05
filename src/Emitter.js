@@ -161,5 +161,3 @@ function createHandler(onValue, onError) {
         }
     };
 }
-
-module.exports = Emitter;
