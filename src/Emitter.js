@@ -109,6 +109,8 @@ function Emitter(executor, args) {
 
         handlers = handlers || [];
         handlers.push(handler);
+
+        return handler.emitter;
     };
 
     this.cancel = function() {
@@ -123,23 +125,39 @@ function Emitter(executor, args) {
 }
 
 function createHandler(onValue, onError) {
+    var emit;
+    var fail;
+    var emitter = new Emitter(function (_emit, _fail) {
+        emit = _emit;
+        fail = _fail;
+    });
     var timeout;
 
     return {
+        emitter: emitter,
         onValue: function(value) {
             clearTimeout(timeout);
             timeout = setTimeout(function() {
-                onValue(value);
+                if (emit) {
+                    emit(onValue(value));
+                } else {
+                    onValue(value);
+                }
             });
         },
         onError: function(error) {
             clearTimeout(timeout);
             timeout = setTimeout(function() {
-                onError(error);
+                if (fail) {
+                    fail(onError(error));
+                } else {
+                    onError(error);
+                }
             });
         },
         cancel: function() {
             clearTimeout(timeout);
+            emitter.cancel();
         }
     };
 }

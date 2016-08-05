@@ -428,4 +428,64 @@ describe('Emitter', function() {
         expect(nestedEmitterDestructorB).toBeCalled();
     });
 
+    describe('#next result', function() {
+
+        it('should be an instance of Emitter', function() {
+            expect(emitter.next(noop, noop) instanceof Emitter).toBe(true);
+        });
+
+        it('should emit values returned by onValue', function() {
+            var onValue = function(value) {
+                return value.length;
+            };
+            var onValueNext = jest.fn();
+            
+            emitter.next(onValue, noop).next(onValueNext, noop);
+            jest.runAllTimers();
+            emit('abc');
+            jest.runAllTimers();
+            expect(onValueNext.mock.calls[0][0]).toBe(3);
+
+            emit('abcdef');
+            jest.runAllTimers();
+            expect(onValueNext.mock.calls[1][0]).toBe(6);
+        });
+
+        it('should be canceled when former Emitter is canceled', function() {
+            var destructorNext = jest.fn();
+            var emitterNext;
+
+            emitterNext = new Emitter(function() {
+                return destructorNext;
+            });
+
+            emitter.next(function() { return emitterNext; }, noop).next(noop, noop);
+            emit();
+            jest.runAllTimers();
+            expect(destructorNext).not.toBeCalled();
+
+            emitter.cancel();
+            expect(destructorNext).toBeCalled();
+        });
+
+        it('should be canceled when former Emitter throws an error', function() {
+            var destructorNext = jest.fn();
+            var emitterNext;
+
+            emitterNext = new Emitter(function() {
+                return destructorNext;
+            });
+
+            emitter.next(function() { return emitterNext; }, noop).next(noop, noop);
+            emit();
+            jest.runAllTimers();
+            expect(destructorNext).not.toBeCalled();
+
+            fail();
+            jest.runAllTimers();
+            expect(destructorNext).toBeCalled();
+        });
+
+    });
+
 });
