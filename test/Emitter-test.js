@@ -220,6 +220,15 @@ describe('Emitter', function() {
         expect(destructor).toBeCalled();
     });
 
+    it('should not call destructor on subsequent #cancel calls', function() {
+        emitter.next(noop, noop);
+        jest.runAllTimers();
+        emitter.cancel();
+        emitter.cancel();
+        emitter.cancel();
+        expect(destructor.mock.calls.length).toBe(1);
+    });
+
     it('should call destructor after fail has been called', function() {
         emitter.next(noop, noop);
         jest.runAllTimers();
