@@ -45,7 +45,7 @@ function Emitter(executor, args) {
             }
 
             outputResolver.resolve(value);
-        }
+        };
         var fail = function(_error) {
             if (state !== STATE.RUNNING) {
                 throw new Error('fail when not running');
@@ -60,7 +60,7 @@ function Emitter(executor, args) {
                     handlers[i].onError(error);
                 }
             });
-        }
+        };
 
         try {
             state = STATE.RUNNING;
