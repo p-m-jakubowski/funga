@@ -13,7 +13,6 @@ var STATE = {
 };
 
 function Emitter(executor, args) {
-
     if (typeof executor !== 'function') {
         throw new Error('Base should be a function');
     }
