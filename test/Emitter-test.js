@@ -426,7 +426,7 @@ describe('Emitter', function() {
             expect(onValueNext.mock.calls[1][0]).toBe(6);
         });
 
-        it('should be canceled when former Emitter is canceled', function() {
+        it('should be canceled when former emitter is canceled', function() {
             var destructorNext = jest.fn();
             var emitterNext = new Emitter(function() {
                 return destructorNext;
@@ -442,7 +442,7 @@ describe('Emitter', function() {
             expect(destructorNext).toBeCalled();
         });
 
-        it('should be canceled when former Emitter throws an error', function() {
+        it('should be canceled when former emitter throws an error', function() {
             var destructorNext = jest.fn();
             var emitterNext = new Emitter(function() {
                 return destructorNext;
