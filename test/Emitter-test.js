@@ -116,7 +116,6 @@ describe('Emitter', function() {
         expect(onValueB.mock.calls.length).toBe(1);
     });
 
-
     it('should not call pending value handlers after being canceled', function() {
         var onValueA = jest.fn();
         var onValueB = jest.fn();
