@@ -43,6 +43,9 @@ function EmitterResolver(onResolve, onError) {
 
     this.resolve = function(emitter) {
         if (lastEmitter && compareEmitters(emitter, lastEmitter)) {
+            if (emitter !== lastEmitter) {
+                emitter.cancel();
+            }
             if (resolvedLeastOnce) {
                 onResolve(lastValue);
             }
@@ -86,41 +89,36 @@ function ObjectResolver(onResolve, onError) {
     this.resolve = function(object) {
         var newEmitterResolvers = {}; 
 
-        object = clone(object);
+        value = clone(object);
 
-        for (var i in object) {
-            if (!(object[i] instanceof Emitter)) {
+        for (var i in value) {
+            if (!(value[i] instanceof Emitter)) {
                 continue;
             }
 
             if (emitterResolvers && (i in emitterResolvers)) {
                 newEmitterResolvers[i] = emitterResolvers[i];
-                object[i] = value[i];
                 emitterResolvers[i] = null;
-                continue;
+            } else {
+                (function(i) {
+                    newEmitterResolvers[i] = new EmitterResolver(
+                        function (partialValue) {
+                            value[i] = partialValue;
+                            maybeCallOnResolve();
+                        },
+                        function (error) {
+                            self.dispose();
+                            onError(error);
+                        }
+                    );
+                })(i);
             }
 
-            (function(i) {
-                newEmitterResolvers[i] = new EmitterResolver(
-                    function (partialValue) {
-                        value[i] = partialValue;
-                        maybeCallOnResolve();
-                    },
-                    function (error) {
-                        self.dispose();
-                        onError(error);
-                    }
-                );
-                newEmitterResolvers[i].resolve(object[i]);
-            })(i);
+            newEmitterResolvers[i].resolve(value[i]);
         }
 
         this.dispose();
-
         emitterResolvers = newEmitterResolvers;
-        value = object;
-
-        maybeCallOnResolve();
     };
 
     this.dispose = function() {
