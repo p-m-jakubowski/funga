@@ -13,6 +13,11 @@ var STATE = {
 };
 
 function Emitter(executor, args) {
+
+    if (typeof executor !== 'function') {
+        throw new Error('Base should be a function');
+    }
+
     var state;
     var destructor;
     var timeout;
@@ -82,10 +87,6 @@ function Emitter(executor, args) {
             fail(error);
         }
     });
-
-    if (typeof executor !== 'function') {
-        throw new Error('Base should be a function');
-    }
 
     this.executor = executor;
     this.args = args || [];
