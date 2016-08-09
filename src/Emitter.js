@@ -131,19 +131,31 @@ function createHandler(onValue, onError, onDestroy) {
     var emit;
     var fail;
     var emitter = new Emitter(function (_emit, _fail) {
-        emit = _emit;
-        fail = _fail;
+        emit = function(value) {
+            try {
+                _emit(onValue(value));
+            } catch (error) {
+                _fail(error);
+            }
+        };
+        fail = function(error) {
+            try {
+                onError(error);
+                emitter.cancel();
+            } catch (error) {
+                _fail(error);
+            }
+        };
         return onDestroy;
     });
 
     return {
         emitter: emitter,
         onValue: function(value) {
-            emit(onValue(value));
+            emit(value);
         },
         onError: function(error) {
-            onError(error);
-            emitter.cancel();
+            fail(error);
         },
         cancel: function() {
             emitter.cancel();

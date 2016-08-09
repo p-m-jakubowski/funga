@@ -459,6 +459,28 @@ describe('Emitter', function() {
             expect(destructorNext).toBeCalled();
         });
 
+        it('should fail when onValue throws an error', function() {
+            var onError = jest.fn();
+
+            emitter.next(function() { throw new Error(); }, noop).next(noop, onError);
+            expect(onError).not.toBeCalled();
+
+            emit();
+            jest.runAllTimers();
+            expect(onError).toBeCalled();
+        });
+
+        it('should fail when onError throws an error', function() {
+            var onError = jest.fn();
+
+            emitter.next(noop, function() { throw new Error(); }).next(noop, onError);
+            expect(onError).not.toBeCalled();
+
+            fail();
+            jest.runAllTimers();
+            expect(onError).toBeCalled();
+        });
+
     });
 
 });
