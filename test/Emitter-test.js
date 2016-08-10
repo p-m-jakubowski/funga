@@ -192,6 +192,39 @@ describe('Emitter', function() {
         expect(destructor).toBeCalled();
     });
 
+    it('should call error handlers with error thrown by destructor', function() {
+        var error = new Error();
+        var emitter = new Emitter(function() {
+            return function() {
+                throw error;
+            };
+        });
+        var onError = jest.fn();
+
+        emitter.next(noop, onError);
+        jest.runAllTimers();
+        emitter.cancel();
+        jest.runAllTimers();
+        expect(onError).toBeCalled();
+        expect(onError.mock.calls[0][0]).toBe(error);
+    });
+
+    it('should eventually call error handlers with error thrown by destructor when failing', function() {
+        var error = new Error();
+        var emitter = new Emitter(function(emit, fail) {
+            setTimeout(fail);
+            return function() {
+                throw error;
+            };
+        });
+        var onError = jest.fn();
+
+        emitter.next(noop, onError);
+        jest.runAllTimers();
+        expect(onError).toBeCalled();
+        expect(onError.mock.calls[0][0]).toBe(error);
+    });
+
     it('should not call destructor on subsequent #cancel calls', function() {
         emitter.cancel();
         emitter.cancel();

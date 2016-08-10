@@ -20,12 +20,52 @@ function Emitter(executor, args) {
     var state;
     var destructor;
     var timeout;
-    var outputResolver;
     var value;
     var error;
 
     var resolvedLeastOnce = false;
     var handlers = [];
+
+    var emit = function(value) {
+        if (state !== STATE.RUNNING) {
+            throw new Error('emit when not running');
+        }
+        outputResolver.resolve(value);
+    };
+
+    var fail = function(_error) {
+        if (state !== STATE.RUNNING) {
+            throw new Error('fail when not running');
+        }
+
+        try {
+            destroy();
+        } catch (error) {
+            return fail(error);
+        }
+        state = STATE.FAILING;
+        timeout = setTimeout(function() {
+            state = STATE.FAILED;
+            error = _error;
+            for (var i = handlers.length - 1; i>=0; --i) {
+                handlers[i].onError(error);
+            }
+        });
+    };
+
+    var outputResolver = new Resolver(
+        function (_value) {
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                resolvedLeastOnce = true;
+                value = _value;
+                for (var i in handlers) {
+                    handlers[i].onValue(value);
+                }
+            });
+        },
+        fail
+    );
 
     var destroy = function() {
         clearTimeout(timeout);
@@ -43,44 +83,8 @@ function Emitter(executor, args) {
     };
 
     timeout = setTimeout(function() {
-        var emit = function(value) {
-            if (state !== STATE.RUNNING) {
-                throw new Error('emit when not running');
-            }
-
-            outputResolver.resolve(value);
-        };
-        var fail = function(_error) {
-            if (state !== STATE.RUNNING) {
-                throw new Error('fail when not running');
-            }
-
-            state = STATE.FAILING;
-            destroy();
-            timeout = setTimeout(function() {
-                state = STATE.FAILED;
-                error = _error;
-                for (var i = handlers.length - 1; i>=0; --i) {
-                    handlers[i].onError(error);
-                }
-            });
-        };
-
         try {
             state = STATE.RUNNING;
-            outputResolver = new Resolver(
-                function (_value) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(function() {
-                        resolvedLeastOnce = true;
-                        value = _value;
-                        for (var i in handlers) {
-                            handlers[i].onValue(value);
-                        }
-                    });
-                }, 
-                fail
-            );
             destructor = executor.apply(null, [emit, fail].concat(args));
         } catch (error) {
             fail(error);
@@ -119,11 +123,15 @@ function Emitter(executor, args) {
     };
 
     this.cancel = function() {
-        destroy();
-        state = STATE.CANCELED;
-        for (var i = handlers.length - 1; i>=0; --i) {
-            handlers[i].cancel();
-        }
+        try {
+            destroy();
+            state = STATE.CANCELED;
+            for (var i = handlers.length - 1; i>=0; --i) {
+                handlers[i].cancel();
+            }
+        } catch (error) {
+            fail(error);
+        };
     };
 }
 
