@@ -19,7 +19,7 @@
   },
   "scripts": {
     "test": "jest",
-    "build": "mkdirp build && browserify -e src/funga.js -s funga | uglifyjs > build/funga.min.js"
+    "build": "mkdirp build && browserify -e src/funga.js -s funga | uglifyjs -m > build/funga.min.js"
   },
   "jest": {
     "automock": false,
