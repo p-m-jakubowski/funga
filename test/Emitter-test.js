@@ -4,32 +4,20 @@ var _ = require('lodash');
 
 var Emitter = require('../src/Emitter');
 
+var noop = function() {};
+
 describe('Emitter', function() {
 
     var emitter;
-    var executor;
-    var args;
-    var destructor;
     var emit;
     var fail;
-    var noop = function() {};
 
     beforeEach(function() {
-        destructor = jest.fn();
-        executor = jest.fn(function(_emit, _fail) {
+        emitter = new Emitter(function (_emit, _fail) {
             emit = _emit;
             fail = _fail;
-            return destructor;
         });
-        args = [{}, {}];
-        emitter = new Emitter(executor, args);
         jest.runAllTimers();
-    });
-
-    afterEach(function() {
-        emit = null;
-        fail = null;
-        emitter.cancel();
     });
 
     it('should throw an error when executor is not a function', function() {
@@ -39,6 +27,10 @@ describe('Emitter', function() {
     });
 
     it('should expose executor and arguments', function() {
+        var executor = function() {};
+        var args = [{}, {}];
+        var emitter = new Emitter(executor, args);
+
         expect(emitter.executor).toBe(executor);
         expect(emitter.args.length).toBe(2);
         expect(emitter.args[0]).toBe(args[0]);
@@ -55,6 +47,16 @@ describe('Emitter', function() {
         expect(executor).toBeCalled();
     });
 
+    it('should pass arguments to executor', function() {
+        var executor = jest.fn();
+        var args = [{}, {}];
+        var emitter = new Emitter(executor, args);
+
+        jest.runAllTimers();
+        expect(executor.mock.calls[0][2]).toBe(args[0]);
+        expect(executor.mock.calls[0][3]).toBe(args[1]);
+    });
+
     it('should not call pending executor after being canceled', function() {
         var executor = jest.fn();
         var emitter = new Emitter(executor);
@@ -66,15 +68,22 @@ describe('Emitter', function() {
         expect(executor).not.toBeCalled();
     });
 
-    it('should pass arguments to executor', function() {
-        expect(executor.mock.calls[0][2]).toBe(args[0]);
-        expect(executor.mock.calls[0][3]).toBe(args[1]);
+    it('should throw an error on #next call when value handler is not a function', function() {
+        expect(function() {
+            emitter.next(null, noop);
+        }).toThrow();
     });
 
-    it('should call asynchronously value handlers with value passed to emit', function() {
-        var value = {a: 1, b: 2};
+    it('should throw an error on #next call when error handler is not a function', function() {
+        expect(function() {
+            emitter.next(noop, null);
+        }).toThrow();
+    });
+
+    it('should call value handlers asynchronously with value passed to emit', function() {
         var onValueA = jest.fn();
         var onValueB = jest.fn();
+        var value = {a: 1, b: 2};
 
         emitter.next(onValueA, noop);
         emitter.next(onValueB, noop);
@@ -89,9 +98,9 @@ describe('Emitter', function() {
         expect(onValueB.mock.calls[0][0]).toBe(value);
     });
 
-    it('should call asynchronously newly registered value handler with last emitted value', function() {
-        var value = {a: 1, b: 2};
+    it('should call newly registered value handler asynchronously with last emitted value', function() {
         var onValue = jest.fn();
+        var value = {a: 1, b: 2};
 
         emit(value);
         jest.runAllTimers();
@@ -129,7 +138,7 @@ describe('Emitter', function() {
         expect(onValueB).not.toBeCalled();
     });
 
-    it('should call asynchronously error handlers with error passed to fail function', function() {
+    it('should call error handlers asynchronously with error passed to fail function', function() {
         var onErrorA = jest.fn();
         var onErrorB = jest.fn();
         var error = new Error();
@@ -148,10 +157,11 @@ describe('Emitter', function() {
     });
 
     it('should call error handlers when executor throws an error', function() {
+        var emitter = new Emitter(function() {
+            throw new Error();
+        });
         var onErrorA = jest.fn();
         var onErrorB = jest.fn();
-
-        emitter = new Emitter(function() { throw new Error(); });
 
         emitter.next(noop, onErrorA);
         emitter.next(noop, onErrorB);
@@ -160,7 +170,7 @@ describe('Emitter', function() {
         expect(onErrorB).toBeCalled();
     });
 
-    it('should call asynchronously newly registered error handler with thrown error', function() {
+    it('should call newly registered error handler asynchronously with thrown error', function() {
         var onError = jest.fn();
 
         fail(new Error());
@@ -186,6 +196,12 @@ describe('Emitter', function() {
     });
 
     it('should call destructor when being canceled', function() {
+        var destructor = jest.fn();
+        var emitter = new Emitter(function() {
+            return destructor;
+        });
+
+        jest.runAllTimers();
         expect(destructor).not.toBeCalled();
 
         emitter.cancel();
@@ -199,14 +215,18 @@ describe('Emitter', function() {
                 throw error;
             };
         });
-        var onError = jest.fn();
+        var onErrorA = jest.fn();
+        var onErrorB = jest.fn();
 
-        emitter.next(noop, onError);
+        emitter.next(noop, onErrorA);
+        emitter.next(noop, onErrorB);
         jest.runAllTimers();
         emitter.cancel();
         jest.runAllTimers();
-        expect(onError).toBeCalled();
-        expect(onError.mock.calls[0][0]).toBe(error);
+        expect(onErrorA).toBeCalled();
+        expect(onErrorB).toBeCalled();
+        expect(onErrorA.mock.calls[0][0]).toBe(error);
+        expect(onErrorB.mock.calls[0][0]).toBe(error);
     });
 
     it('should eventually call error handlers with error thrown by destructor when failing', function() {
@@ -217,15 +237,25 @@ describe('Emitter', function() {
                 throw error;
             };
         });
-        var onError = jest.fn();
+        var onErrorA = jest.fn();
+        var onErrorB = jest.fn();
 
-        emitter.next(noop, onError);
+        emitter.next(noop, onErrorA);
+        emitter.next(noop, onErrorB);
         jest.runAllTimers();
-        expect(onError).toBeCalled();
-        expect(onError.mock.calls[0][0]).toBe(error);
+        expect(onErrorA).toBeCalled();
+        expect(onErrorB).toBeCalled();
+        expect(onErrorA.mock.calls[0][0]).toBe(error);
+        expect(onErrorB.mock.calls[0][0]).toBe(error);
     });
 
     it('should not call destructor on subsequent #cancel calls', function() {
+        var destructor = jest.fn();
+        var emitter = new Emitter(function() {
+            return destructor;
+        });
+
+        jest.runAllTimers();
         emitter.cancel();
         emitter.cancel();
         emitter.cancel();
@@ -233,6 +263,14 @@ describe('Emitter', function() {
     });
 
     it('should call destructor after fail has been called', function() {
+        var fail;
+        var destructor = jest.fn();
+        var emitter = new Emitter(function(_emit, _fail) {
+            fail = _fail;
+            return destructor;
+        });
+
+        jest.runAllTimers();
         expect(destructor).not.toBeCalled();
 
         fail();
@@ -251,7 +289,7 @@ describe('Emitter', function() {
 
     it('should call value handler with resolved emitter', function() {
         var nestedValue = {a: 1};
-        var nestedEmitter = new Emitter(function(emit, fail) {
+        var nestedEmitter = new Emitter(function(emit) {
             emit(nestedValue);
         });
         var onValue = jest.fn();
@@ -263,7 +301,6 @@ describe('Emitter', function() {
     });
 
     it('should reuse subsequently emitted equal emitters', function() {
-        var nestedValue = {a: 1};
         var nestedEmit;
         var nestedEmitterDestructor = jest.fn();
         var nestedEmitterBase = jest.fn(function(emit, fail) {
@@ -271,6 +308,7 @@ describe('Emitter', function() {
             return nestedEmitterDestructor;
         });
         var nestedEmitter = new Emitter(nestedEmitterBase);
+        var nestedValue = {a: 1};
         var onValue = jest.fn();
 
         emitter.next(onValue, noop);
@@ -296,7 +334,8 @@ describe('Emitter', function() {
     });
     
     it('should cancel nested emitter when being canceled', function() {
-        var nestedEmitterDestructor = jest.fn(); var nestedEmitter = new Emitter(jest.fn(function() {
+        var nestedEmitterDestructor = jest.fn();
+        var nestedEmitter = new Emitter(jest.fn(function() {
             return nestedEmitterDestructor;
         }));
 
@@ -321,11 +360,11 @@ describe('Emitter', function() {
     });
  
     it('should call value handler with resolved enumerable', function() {
-        var nestedValue = {a: 1};
         var nestedEmitterBase = function(emit, fail) {
             emit(nestedValue);
         };
         var onValue = jest.fn()
+        var nestedValue = {a: 1};
 
         emitter.next(onValue, noop);
         emit({ nestedValue: new Emitter(nestedEmitterBase) });
@@ -338,23 +377,21 @@ describe('Emitter', function() {
     });
 
     it('should reuse emitters in enumerable and cancel not reused', function() {
-        var nestedValueA = {};
-        var nestedValueB = {};
-        var nestedValueC = {};
-        var nestedValueD = {};
-
         var nestedEmitterDestructorA = jest.fn();
+        var nestedEmitterDestructorB = jest.fn();
         var nestedEmitterBaseA = jest.fn(function(emit) {
             emit(nestedValueA);
             return nestedEmitterDestructorA;
         });
-        var nestedEmitterDestructorB = jest.fn();
         var nestedEmitterBaseB = jest.fn(function(emit) {
             emit(nestedValueB);
             return nestedEmitterDestructorB;
         });
-
         var onValue = jest.fn();
+        var nestedValueA = {};
+        var nestedValueB = {};
+        var nestedValueC = {};
+        var nestedValueD = {};
 
         emitter.next(onValue, noop);
         emit({
@@ -404,10 +441,10 @@ describe('Emitter', function() {
 
     it('should call error handler and cancel emitters in enumerable when any of them fails', function() {
         var nestedEmitterDestructorA = jest.fn();
+        var nestedEmitterDestructorB = jest.fn();
         var nestedEmitterA = new Emitter(jest.fn(function() {
             return nestedEmitterDestructorA;
         }));
-        var nestedEmitterDestructorB = jest.fn();
         var nestedEmitterB = new Emitter(jest.fn(function(emit, fail) {
             setTimeout(fail);
             return nestedEmitterDestructorB;
@@ -423,18 +460,6 @@ describe('Emitter', function() {
         expect(onError).toBeCalled();
         expect(nestedEmitterDestructorA).toBeCalled();
         expect(nestedEmitterDestructorB).toBeCalled();
-    });
-
-    it('should throw an error on #next call when value handler is not a function', function() {
-        expect(function() {
-            emitter.next(null, noop);
-        }).toThrow();
-    });
-
-    it('should throw an error on #next call when error handler is not a function', function() {
-        expect(function() {
-            emitter.next(noop, null);
-        }).toThrow();
     });
 
     describe('#next result', function() {
