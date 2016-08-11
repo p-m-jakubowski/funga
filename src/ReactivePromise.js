@@ -1,18 +1,18 @@
 'use strict';
 
 // little hack to handle circular dependencies
-module.exports = Emitter;
+module.exports = ReactivePromise;
 
-var Resolver = require('./Resolver');
+var SmartResolver = require('./SmartResolver');
 
 var STATE = {
     RUNNING: 0,
-    FAILING: 1,
-    FAILED: 2,
+    REJECTING: 1,
+    REJECTED: 2,
     CANCELED: 3
 };
 
-function Emitter(executor, args) {
+function ReactivePromise(executor, args) {
     if (typeof executor !== 'function') {
         throw new Error('Base should be a function');
     }
@@ -26,52 +26,52 @@ function Emitter(executor, args) {
     var resolvedLeastOnce = false;
     var handlers = [];
 
-    var emit = function(value) {
+    var resolve = function(value) {
         if (state !== STATE.RUNNING) {
-            throw new Error('emit when not running');
+            throw new Error('resolve when not running');
         }
-        outputResolver.resolve(value);
+        smartResolver.resolve(value);
     };
 
-    var fail = function(_error) {
+    var reject = function(_error) {
         if (state !== STATE.RUNNING) {
-            throw new Error('fail when not running');
+            throw new Error('reject when not running');
         }
 
         try {
             destroy();
         } catch (error) {
-            return fail(error);
+            return reject(error);
         }
-        state = STATE.FAILING;
+        state = STATE.REJECTING;
         timeout = setTimeout(function() {
-            state = STATE.FAILED;
+            state = STATE.REJECTED;
             error = _error;
             for (var i = handlers.length - 1; i>=0; --i) {
-                handlers[i].onError(error);
+                handlers[i].onReject(error);
             }
         });
     };
 
-    var outputResolver = new Resolver(
+    var smartResolver = new SmartResolver(
         function (_value) {
             clearTimeout(timeout);
             timeout = setTimeout(function() {
                 resolvedLeastOnce = true;
                 value = _value;
                 for (var i in handlers) {
-                    handlers[i].onValue(value);
+                    handlers[i].onResolve(value);
                 }
             });
         },
-        fail
+        reject
     );
 
     var destroy = function() {
         clearTimeout(timeout);
-        if (outputResolver) {
-            outputResolver.dispose();
-            outputResolver = null;
+        if (smartResolver) {
+            smartResolver.dispose();
+            smartResolver = null;
         }
         if (typeof destructor === 'function') {
             try {
@@ -85,25 +85,25 @@ function Emitter(executor, args) {
     timeout = setTimeout(function() {
         try {
             state = STATE.RUNNING;
-            destructor = executor.apply(null, [emit, fail].concat(args));
+            destructor = executor.apply(null, [resolve, reject].concat(args));
         } catch (error) {
-            fail(error);
+            reject(error);
         }
     });
 
     this.executor = executor;
     this.args = args || [];
 
-    this.next = function(onValue, onError) {
-        if (typeof onValue !== 'function') {
-            throw new Error('onValue must be a function');
+    this.next = function(onResolve, onReject) {
+        if (typeof onResolve !== 'function') {
+            throw new Error('onResolve must be a function');
         }
 
-        if (typeof onError !== 'function') {
-            throw new Error('onError must be a function');
+        if (typeof onReject !== 'function') {
+            throw new Error('onReject must be a function');
         }
 
-        var handler = createHandler(onValue, onError, function() {
+        var handler = createHandler(onResolve, onReject, function() {
             handlers.splice(handlers.indexOf(handler), 1);
         });
 
@@ -111,15 +111,15 @@ function Emitter(executor, args) {
             handlers.push(handler);
 
             if (state === STATE.RUNNING && resolvedLeastOnce) {
-                handler.onValue(value);
-            } else if (state === STATE.FAILED) {
-                handler.onError(error);
+                handler.onResolve(value);
+            } else if (state === STATE.REJECTED) {
+                handler.onReject(error);
             } else if (state === STATE.CANCELED) {
                 handler.cancel();
             }
         });
 
-        return handler.emitter;
+        return handler.reactivePromise;
     };
 
     this.cancel = function() {
@@ -130,43 +130,43 @@ function Emitter(executor, args) {
                 handlers[i].cancel();
             }
         } catch (error) {
-            fail(error);
+            reject(error);
         };
     };
 }
 
-function createHandler(onValue, onError, onDestroy) {
-    var emit;
-    var fail;
-    var emitter = new Emitter(function (_emit, _fail) {
-        emit = function(value) {
+function createHandler(onResolve, onReject, onCancel) {
+    var resolve;
+    var reject;
+    var reactivePromise = new ReactivePromise(function (_resolve, _reject) {
+        resolve = function(value) {
             try {
-                _emit(onValue(value));
+                _resolve(onResolve(value));
             } catch (error) {
-                _fail(error);
+                _reject(error);
             }
         };
-        fail = function(error) {
+        reject = function(error) {
             try {
-                onError(error);
-                emitter.cancel();
+                onReject(error);
+                reactivePromise.cancel();
             } catch (error) {
-                _fail(error);
+                _reject(error);
             }
         };
-        return onDestroy;
+        return onCancel;
     });
 
     return {
-        emitter: emitter,
-        onValue: function(value) {
-            emit(value);
+        reactivePromise: reactivePromise,
+        onResolve: function(value) {
+            resolve(value);
         },
-        onError: function(error) {
-            fail(error);
+        onReject: function(error) {
+            reject(error);
         },
         cancel: function() {
-            emitter.cancel();
+            reactivePromise.cancel();
         }
     };
 }

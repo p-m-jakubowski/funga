@@ -6,7 +6,7 @@
       "type": "git",
       "url": "https://github.com/p-m-jakubowski/funga"
   },
-  "main": "src/funga.js",
+  "main": "src/index.js",
   "devDependencies": {
     "browserify": "~13.0.0",
     "jest-cli": "~12.0.2",
@@ -19,7 +19,7 @@
   },
   "scripts": {
     "test": "jest",
-    "build": "mkdirp build && browserify -e src/funga.js -s funga | uglifyjs -m > build/funga.min.js"
+    "build": "mkdirp build && browserify -e src/index.js -s ReactivePromise | uglifyjs -m > build/reactive-promise.min.js"
   },
   "jest": {
     "automock": false,
