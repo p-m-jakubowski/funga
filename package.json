@@ -4,7 +4,7 @@
   "license": "MIT",
   "repository": {
       "type": "git",
-      "url": "https://github.com/p-m-jakubowski/funga"
+      "url": "https://github.com/p-m-jakubowski/reactive-promise"
   },
   "main": "src/index.js",
   "devDependencies": {
