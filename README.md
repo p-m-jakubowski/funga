@@ -1,213 +1,211 @@
-# funga
+# reactive-promise
+
+## Overview
+
+ReactivePromise is very similar to typical Promise.  
+It differs in that, it can change its value (i.e. can be resolved multiple times).  
+It also includes features like [cancellation](#cancellation) and [smart resolving](#smart-resolving).  
 
 ## Installation
 
 ```
-npm install --save funga
+npm install --save reactive-promise
 ```
 
 It's an isomorphic module, so you can use it with [Browserify](https://github.com/substack/node-browserify) 
 or [webpack](https://github.com/webpack/webpack).
 
 If you want to use it with [RequireJS](https://github.com/requirejs/requirejs) or as global variable in browser environment
-you have to run `npm run build` - it will create `funga.min.js` script in UMD format under `build/` directory.
+you have to run `npm run build` - it will create `reactive-promise.min.js` script in UMD format under `build/` directory.
 
 ## Usage
 
+### Basic
+
 ```javascript
-const funga = require('funga');
+const ReactivePromise = require('reactive-promise');
 ```
 
-### emit
-
-`funga.emit` creates emitter factory.  
-Function passed to `funga.emit` (we will refer to this function as base) will be used to run emitter.  
-base is always called with two functions.  
-First one is used to emit values. This function may be called more than once.  
-Second one is used to emit error and may be called only once. After that neither one of these two functions can be called.  
-Rest of the parameters passed to base are the ones you pass to emitter factory when creating emitter.
+You create ReactivePromise very similar to Promise.  
+Function passed to ReactivePromise (*executor*) is called asynchronously.  
 
 ```javascript
-const emitRange = funga.emit(
-    function base(emit, fail, from, to) {
-        var counter = from;
-        var interval = setInterval(function() {
-            if (counter > to) {
-                return fail(new Error('limit exceeded'));
-            }
-            emit(counter);
-            counter++;
-        }, 1000);
-
-        return function destructor() {
-            clearInterval(interval);
-        };
-    }
-);
-
-const rangeEmitter = emitRange(1, 10);
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    // ...
+});
 ```
 
-Until you call `next`, base will not be called.
+Now you can call `resolve` as many times as you want.  
 
 ```javascript
-rangeEmitter.next(console.log, console.error);
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    var counter = 0;
+    setInterval(function() {
+        resolve(counter);
+        counter++;
+    }, 1000);
+});
 ```
 
-In above example, each number from 1 to 10 will be logged.   
-After that, emitter fails with error containing 'limit exceeded' message.  
-When this happens, destructor (function returned by base) will be called.  
-You may destroy emitter at any moment by calling `destroy` method.
-
-### consume
-
-`funga.consume` creates consumer factory.  
-Consumer is of Emitter type (so it exposes `next` and `destroy` methods).  
-From Emitter it differs in how values are emitted.  
-Instead of base, you pass digest function when creating factory.
+But, of course, reject can be called only once.  
+NOTE: ReactivePromise will be rejected if executor throws an error.
 
 ```javascript
-const consumeRanges = funga.consume(
-    function digest(numberA, numberB, numberC) {
-        return {
-            A: numberA,
-            B: numberB,
-            C: numberC
-        };
-    }
-);
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    reject(new Error());
+
+    setTimeout(function() {
+        reject(new Error()); // <-- this will fail
+    });
+});
 ```
 
-Consumer may be fed with emitters, but values passed to digest will be values emitted by them.
+If you want to read reactive-promise value (or error), run its `next` method (it's ReactivePromise equivalent of Promise's `then`).  
+`next` call returns another ReactivePromise, that resolves to result of value handler.  
 
 ```javascript
-const rangesConsumer = consumeRanges(emitRange(1, 10), emitRange(11, 20), emitRange(21, 30));
+reactivePromise.next(
+    function (value) {
+        return value * 2;
+    }, function (error) {
+        // ...
+    })
+    .next(console.log, console.error);
+
+// console will print: 0, 2, 4, 6, 8...
 ```
 
-After all emitters emit values, digest will be called and consumer will emit value returned by it.  
-After that, every time new value is emitted, digest will be called and consumer will emit new value.  
-If digest throws an error, consumer will fail and all emitters, that consumer was fed with, will be destroyed.  
-
-
+You may also pass additional parameters to executor.
 ```javascript
-rangesConsumer.next(console.log, console.error);
+var reactivePromise = new ReactivePromise(function (resolve, reject, param1, param2) {
+    // ... 
+}, ['param-1', 'param-2']);
 ```
 
-In above example, consumer will emit objects `{ A: <number 1-10>, B: <number 11-20>, C: <number 21-30>}`.
-Eventually, when one of the consumed emitters fail, consumer will also fail and the rest of emitters will be destroyed.
+<a name="cancellation" />
+### Cancellation
 
-### resolve
-
-`funga.resolve` creates factory using another factory (one returned by `funga.emit` or `funga.consume`).  
+You may return destructor, that is used when reactive-promise is cancelled or when is rejected.
 
 ```javascript
-const emitEmitter = funga.emit(function (emit, fail) {
-    emit(emitRange(1, 10));
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    var counter = 0;
+    var interval = setInterval() {
+        resolve(counter);
+        counter++;
+    };
+
+    return function() {
+        clearInterval(interval);
+    };
 });
 
-const emitEmitterAndResolve = funga.resolve(emitEmitter);
-
-const emitter = emitEmitterAndResolve();
-
-emitter.next(console.log, console.error);
+reactivePromise.cancel();
 ```
 
-Now, because emitEmitter was wrapped using `funga.resolve`, numbers from 1 to 10 will be logged and then emitter will fail.  
-That's not very impressive: we could just call `emitRange` and we would end up with the exactly same result.  
-Interesting thing happens, when you subsequently emit equal emitters:
+NOTE: ReactivePromise will be rejected if destructor throws an error.
+
+<a name="smart-resolving" />
+### Smart resolving
+
+If you pass instance of ReactivePromise to `resolve` function, reactive-promise will resolve deeply.
 
 ```javascript
-const emitEmitterAndResolve = funga.resolve(
-    funga.emit(function (emit, fail) {
-        var interval = setInterval(function() {
-            emit(emitRange(1, 10));
-        }, 100);
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    resolve(new ReactivePromise(function(_resolve, _reject) {
+        _resolve(1);
+    }));
+});
 
-        return function() {
-            clearInterval(interval):
-        };
-    })
-);
-
-const emitter = emitEmitterAndResolve();
-
-emitter.next(console.log, console.error);
+reactivePromise.next(console.log, console.error); 
+// console will print 1
 ```
 
-What will happen now? Again, number from 1 to 10 will be logged and after that emitter will fail.  
-Emitter returned by `emitRange(1, 10)` will run only once (even if has been emitted multiple times)!  
-Because emitter was created from factory wrapped in `funga.resolve`, it knows when subsequently emitted emitter is the same as the last one and, instead of calling it again, skips and uses already running.  
+But nested reactive-promises are resolved in a smart way.
+```javascript
+var nestedExecutor = function(resolve, reject) {
+    console.log('create nested reactive-promise');
+    resolve(1);
+};
 
-When subsequently emitted emitter differs, the last one is destroyed and replaced be the new one.
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    resolve(new ReactivePromise(nestedExecutor));
 
-```javascript 
-const emitEmitterAndResolve = funga.resolve(
-    funga.emit(function (emit, fail) {
-        var timeout = setTimeout(function() {
-            emit(emitRange(101, 200));
-        }, 5000);
+    setTimeout(function() {
+        resolve(new ReactivePromise(nestedExecutor));
+    });
+});
 
-        emit(emitRange(1, 100));
+reactivePromise.next(console.log, console.error); 
 
-        return function() {
-            clearTimeout(timeout);
-        };
-    })
-);
-
-const emitter = emitEmitterAndResolve();
-
-emitter.next(console.log, console.error);
+// console will print three times: 
+// 1) 'create nested reactive-promise'
+// 2) 1
+// 3) 1
 ```
 
-In above example, numbers from range 1-100 will be emitted (not all, only the ones that will be emitted within 5 seconds period).
-Then emitter will start emitting numbers starting from 101 and will fail after reaching 200.
+What happened there? When resolve is subsequently called with equal instance of ReactivePromise 
+it simply cancels latter one (before it calls its executor) and continue with already running.  
 
-When using `funga.resolve` also emitters returned in object are resolved.
+When two ReactivePromises are considered equal?
+```javascript
+var executor = function() {}
+
+// equal
+new ReactivePromise(executor);
+new ReactivePromise(executor);
+
+// equal
+new ReactivePromise(executor, [1, {a:1}])
+new ReactivePromise(executor, [1, {a:1}])
+
+// non-equal
+new ReactivePromise(executor, [1, {a:1}])
+new ReactivePromise(executor, [2, {a:2, b:3}])
+
+// non-equal (executors are compared with identity operator)
+new ReactivePromise(function(resolve, reject) {}, [1, {a:1}])
+new ReactivePromise(function(resolve, reject) {}, [1, {a:1}])
+```
+
+ReactivePromise static method `createFactory` is helpful for creating equal ReactivePromises.
 
 ```javascript
-const emitEmitterAndResolve = funga.resolve(
-    funga.emit(function (emit, fail) {
-        emit({
-            A: emitRange(1, 10),
-            B: emitRange(11, 20),
-            C: Infinity
+var createReactivePromise = ReactivePromise.createFactory(executor);
+
+// it will create equal ReactivePromises
+createReactivePromise(1, 2, {a:1});
+createReactivePromise(1, 2, {a:1});
+```
+
+ReactivePromise passed in an object will also be smart resolved. 
+```javascript
+
+var createReactivePromise = ReactivePromise.createFactory(
+    function(resolve, reject) {
+        console.log('create nested reactive-promise');
+        resolve(1);
+    }
+);
+
+var reactivePromise = new ReactivePromise(function(resolve, reject) {
+    resolve({
+        a: createReactivePromise(1),
+        b: createReactivePromise(1, 2),
+        c: createReactivePromise(1, 2, 3)
+    });
+
+    setTimeout(function() {
+        resolve({
+            a: createReactivePromise(1),
+            b: createReactivePromise(2, 3)
         });
-    })
-);
-const emitter = emitEmitterAndResolve();
+    });
+});
 
-emitter.next(console.log, console.error);
+reactivePromise.next(console.log, console.error); 
+
+// reactive-promise indexed with 'a' key will be reused
 ```
 
-In above example emitter will emit objects `{ A: <number 1-10>, B: <number 11-20>, C: Infinity }`.
-
-Emitters in object/array are reused, if emitters indexed by the same key are equal.
-
-```javascript
-const consumeNumberAndResolve = funga.resolve(
-    funga.consume(function (number) {
-        if (number < 5) {
-            return {
-                A: emitRange(1, 10),
-                B: emitRange(21, 30),
-                C: 'C'
-            };
-        } else {
-            return {
-                A: emitRange(1, 10),
-                B: emitRange(11, 20),
-                C: emitRange(21, 30)
-            };
-        }
-    })
-);
-const emitter = consumeNumberAndResolve(emitRange(1, 10));
-
-emitter.next(console.log, console.error);
-```
-
-In above example, as long as consumed emitter will emit numbers below 5, emitter will emit objects `{ A: <number 1-10>, B: <number 21-30>, C: 'C' }`.  
-Until then emitters indexed by 'A' and 'B' will be reused.  
-After consuming numbers starts to be equal or greater than five, emitter will start emitting objects `{ A: <number 1-10>, B: <number 11-20>, C: <number 21-30> }`.  
-Emitter indexed by 'B' will be destroyed and replaced with new one. Emitter indexed by 'A' won't be destroyed. 
+NOTE: currently there is no way to get equal ReactivePromise returned by `next`. 
