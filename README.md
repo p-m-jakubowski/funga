@@ -2,6 +2,14 @@
 
 Library that implements a reactive variation on Promise.  
 
+* [Overview](#overview)
+* [Installation](#installation)
+* [Usage](#usage)
+  * [Basic](#basic)
+  * [Cancellation](#cancellation)
+  * [Smart resolving](#smart-resolving)
+  * [Known limitations](#known-limitations)
+
 ## Overview
 
 ReactivePromise is very similar to Promise.  
