@@ -221,7 +221,7 @@ reactivePromise.next(console.log, console.error);
 
 You should not resolve chained reactive-promises, i.e. 
 
-```
+```javascript
 var reactivePromise = new ReactivePromise(function(resolve, reject) {
     resolve(createReactivePromise().next(/* ... */));
 
